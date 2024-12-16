@@ -27,6 +27,8 @@ export interface Message {
   }[][];
   showGraph?: boolean;
   showPercent?: boolean;
+  forks?: Message[];
+  forkedOnIndex?: number;
 }
 
 export interface Tab {
