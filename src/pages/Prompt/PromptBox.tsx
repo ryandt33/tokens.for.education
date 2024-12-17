@@ -64,8 +64,6 @@ export default function PromptBox({
         tokenLogprobs: response.tokenLogprobs.flat(),
       };
 
-      console.log({ updatedResponse, messages });
-
       storeContext?.updateTabMessages(
         messages.map((m, i) => (i === index ? updatedResponse : m))
       );
@@ -95,16 +93,18 @@ export default function PromptBox({
       <Card
         variant={message.role === "user" ? Variant.SECONDARY : Variant.PRIMARY}
       >
-        <div
-          className="text-right mr-5 mt-3 cursor-pointer"
-          onClick={() => {
-            if (!messages) return;
-            const newMessages = messages?.filter((_m, i) => i !== index);
+        <div className="text-right mr-5 mt-3">
+          <span
+            className="cursor-pointer"
+            onClick={() => {
+              if (!messages) return;
+              const newMessages = messages?.filter((_m, i) => i !== index);
 
-            storeContext?.updateTabMessages(newMessages);
-          }}
-        >
-          X
+              storeContext?.updateTabMessages(newMessages);
+            }}
+          >
+            X
+          </span>
         </div>
         <div>
           <div className="p-4 flex w-full">

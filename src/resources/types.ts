@@ -28,8 +28,9 @@ export interface Message {
   showGraph?: boolean;
   showPercent?: boolean;
   forks?: Message[];
-  forkedonToken?: number;
+  forkedOnToken?: number;
   forkIndex?: number;
+  confidence?: string;
 }
 
 export interface Tab {

@@ -48,8 +48,6 @@ export default function LogitBiasSettings() {
     });
   }, [Object.keys(logitBias)]);
 
-  console.log({ logitBias });
-
   return (
     <div
       className={`fixed h-screen min-w-72 top-0 right-0 bg-slate-100 border-l-2 border-slate-300 shadow-lg p-4 ${
@@ -93,7 +91,6 @@ export default function LogitBiasSettings() {
           .sort((a, b) => Number(a[0]) - Number(b[0]))
           .map(([key, value], i) => {
             const token = decodedTokenMemo.find((t) => t.key === key)?.token;
-            console.log({ key, value });
             return (
               <div
                 key={i}

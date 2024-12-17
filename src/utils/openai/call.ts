@@ -69,6 +69,30 @@ export const inference = async (
   }
 };
 
+export const pos = async (tokens: any[]) => {
+  const body = JSON.stringify({
+    tokens,
+  });
+
+  const res = await fetch(`${BACKEND_URL}/api/pos`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body,
+  });
+
+  try {
+    const json = await res.json();
+
+    return json;
+  } catch (error) {
+    console.error(error);
+
+    throw new Error("Failed to generate response");
+  }
+};
+
 export const verifyApiKey = async (apiKey: string) => {
   const models = await getModels(apiKey);
 
