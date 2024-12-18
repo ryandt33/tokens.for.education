@@ -31,6 +31,15 @@ export interface Message {
   forkedOnToken?: number;
   forkIndex?: number;
   confidence?: string;
+  embedding?: number[];
+  distance?: {
+    eucDist: number;
+    cosSim: number;
+    manDist: number;
+    chebyDist: number;
+    jaccDist: number;
+    dotProd: number;
+  };
 }
 
 export interface Tab {

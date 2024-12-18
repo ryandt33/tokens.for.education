@@ -1,6 +1,6 @@
 import { Store } from "../../context/storeContext";
 import { Role } from "../../resources/types";
-import { inference, pos } from "./call";
+import { getEmbedding, inference } from "./call";
 
 interface TokenInfo {
   token: string;
@@ -61,17 +61,25 @@ export const generate = async (
       );
 
       try {
-        const tokens = json.choices[0].logprobs.content;
+        const content = json.choices[0].message.content;
 
-        const tokenLogprobs = await pos(tokens);
+        const embeddingResponse = await getEmbedding(content);
+
+        const embedding: number[] =
+          embeddingResponse?.data?.[0]?.embedding ?? "";
+        // const tokens = json.choices[0].logprobs.content;
+
+        // const tokenLogprobs = await pos(tokens);
 
         return {
           role: Role.ASSISTANT,
           content: json.choices[0].message.content,
-          tokenLogprobs,
+          tokenLogprobs: json.choices[0].logprobs.content,
+          embedding,
           showPercent: true,
         };
       } catch (error) {
+        console.log(error);
         return {
           role: Role.ASSISTANT,
           content: json.choices[0].message.content,

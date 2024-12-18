@@ -93,6 +93,30 @@ export const pos = async (tokens: any[]) => {
   }
 };
 
+export const getEmbedding = async (content: string) => {
+  const body = JSON.stringify({
+    content,
+  });
+
+  const res = await fetch(`${BACKEND_URL}/api/embedding`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body,
+  });
+
+  try {
+    const json = await res.json();
+
+    return json;
+  } catch (error) {
+    console.error(error);
+
+    throw new Error("Failed to generate response");
+  }
+};
+
 export const verifyApiKey = async (apiKey: string) => {
   const models = await getModels(apiKey);
 

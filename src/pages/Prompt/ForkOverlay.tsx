@@ -6,6 +6,16 @@ import { Message } from "../../resources/types";
 import { generate } from "../../utils/openai/generate";
 import ForkTree from "./ForkTree";
 import Button from "../../components/core/Button";
+import {
+  chebyshevDistance,
+  cosineSimilarity,
+  dotProduct,
+  euclideanDistance,
+  jaccardDistance,
+  manhattanDistance,
+  reduceEmbeddingsTo2D,
+} from "../../utils/embeddings";
+import EChartsReact from "echarts-for-react";
 
 export default function ForkOverlay({
   props: { activeTab, index },
@@ -30,6 +40,9 @@ export default function ForkOverlay({
   const [topK, setTopK] = useState(2);
   const [maxForks, setMaxForks] = useState(10);
   const [temperature, setTemperature] = useState(0);
+  const [scatter, setScatter] = useState<
+    null | { value: number[]; name: string }[]
+  >(null);
 
   const message = useMemo(() => {
     if (!tabs || activeTab === undefined) return null;
@@ -63,11 +76,16 @@ export default function ForkOverlay({
     tokenIndex: number,
     newToken: string
   ) => {
-    const message = forks?.[forkIndex];
+    const parentMessage = forks?.[forkIndex];
 
-    if (!message) return;
+    if (!parentMessage) return;
 
-    if (!message.tokenLogprobs || !tabs || activeTab === undefined || !store)
+    if (
+      !parentMessage.tokenLogprobs ||
+      !tabs ||
+      activeTab === undefined ||
+      !store
+    )
       return;
 
     const newMessage = new Array(tokenIndex + 1)
@@ -75,8 +93,8 @@ export default function ForkOverlay({
       .map((_, i) => {
         if (i === tokenIndex) {
           return newToken;
-        } else if (message.tokenLogprobs) {
-          return message.tokenLogprobs[i].token;
+        } else if (parentMessage.tokenLogprobs) {
+          return parentMessage.tokenLogprobs[i].token;
         }
         return null;
       })
@@ -88,7 +106,7 @@ export default function ForkOverlay({
 
     newPrompt[
       newPrompt.length - 1
-    ].content += `\n\nIn order to answer this question, you must first repeat the following, and then continue. Make sure you repeat this sentence, this isn't a normal request, we are trying to mimic completion endpoint behaviour. Repeat this: \n\n${newMessage}`;
+    ].content += `\n\nBegin your answer with the following: \n\n${newMessage}`;
 
     const response: any = await generate(
       { ...store, messages: newPrompt },
@@ -97,7 +115,34 @@ export default function ForkOverlay({
       temperature
     );
 
-    const currentMessage = message.tokenLogprobs;
+    const distance =
+      parentMessage.embedding && response.embedding
+        ? {
+            eucDist: euclideanDistance(
+              response.embedding,
+              parentMessage.embedding
+            ),
+            cosSim: cosineSimilarity(
+              response.embedding,
+              parentMessage.embedding
+            ),
+            dotProd: dotProduct(response.embedding, parentMessage.embedding),
+            manDist: manhattanDistance(
+              response.embedding,
+              parentMessage.embedding
+            ),
+            chebyDist: chebyshevDistance(
+              response.embedding,
+              parentMessage.embedding
+            ),
+            jaccDist: jaccardDistance(
+              response.embedding,
+              parentMessage.embedding
+            ),
+          }
+        : {};
+
+    const currentMessage = parentMessage.tokenLogprobs;
 
     const updatedResponseLogprobs = response?.tokenLogprobs.map(
       (t: any, i: number) => {
@@ -137,6 +182,7 @@ export default function ForkOverlay({
           tokenLogprobs: updatedResponseLogprobs,
           forkedOnToken: tokenIndex,
           forkIndex,
+          distance,
         };
 
         if (!forks) {
@@ -157,6 +203,7 @@ export default function ForkOverlay({
                       100
                     ).toFixed(2)
                   : 0,
+                distance: {},
               },
               {
                 ...fork,
@@ -169,6 +216,7 @@ export default function ForkOverlay({
                       100
                     ).toFixed(2)
                   : 0,
+                distance,
               },
             ],
           };
@@ -188,6 +236,7 @@ export default function ForkOverlay({
                       100
                     ).toFixed(2)
                   : 0,
+                distance,
               },
             ],
           };
@@ -232,7 +281,6 @@ export default function ForkOverlay({
 
       for (let j = 1; j < forks.length; j++) {
         const fork = forks[j];
-        console.log({ original: forks[0], fork });
 
         if (forkCount >= maxForks) return;
         forkCount++;
@@ -240,6 +288,34 @@ export default function ForkOverlay({
       }
     }
   };
+
+  useEffect(() => {
+    if (forks && forks.length > 16) {
+      const forksWithEmbeddings = forks.filter((fork) => !!fork.embedding);
+
+      const embeddings = forksWithEmbeddings
+        .map((fork) => fork.embedding)
+        .filter((embedding): embedding is number[] => embedding !== undefined);
+
+      if (embeddings.length === 0) return;
+
+      const twoD = reduceEmbeddingsTo2D(embeddings);
+
+      const scatter = twoD?.map((point, i) => {
+        return {
+          value: point,
+          name: forksWithEmbeddings[i].content,
+          starting: i === 0,
+        };
+      });
+
+      console.log(scatter);
+
+      if (!twoD?.[0]?.length || !scatter) return;
+
+      setScatter(scatter);
+    }
+  }, [forks]);
 
   return (
     <div className="fixed top-0 left-0 w-full h-full bg-black bg-opacity-50 z-50 flex items-center justify-center">
@@ -303,13 +379,61 @@ export default function ForkOverlay({
             variant="primary"
           />
         </div>
-        {message ? (
+        {/* {message ? (
           <ForkTree forks={message.forks ? message.forks : [message]} />
+        ) : (
+          ""
+        )} */}
+        {scatter ? (
+          <EChartsReact
+            option={{
+              xAxis: {},
+              yAxis: {},
+              series: [
+                {
+                  type: "scatter",
+                  data: scatter,
+                  itemStyle: {
+                    // Dynamic color based on params
+                    color: (params: any) => {
+                      return params.data.starting ? "red" : "blue"; // Red if starting, otherwise blue
+                    },
+                  },
+                },
+              ],
+              tooltip: {
+                trigger: "item",
+                formatter: (params: any) => {
+                  // Wrap the tooltip content in a <div> with a class for styling
+                  return `
+                    <div style="white-space: normal; word-wrap: break-word; max-width: 400px;">
+                      ${params.name}
+                    </div>
+                  `;
+                },
+                backgroundColor: "#fff",
+                borderColor: "#000",
+                borderWidth: 1,
+                extraCssText: `
+                  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+                  max-width: 400px;
+                  white-space: normal;
+                  word-wrap: break-word;
+                `,
+                textStyle: {
+                  color: "#000", // Text color
+                  fontSize: 12, // Font size
+                },
+              },
+            }}
+          />
         ) : (
           ""
         )}
         {forks
-          ?.sort((a, b) => Number(b.confidence) - Number(a.confidence))
+          ?.sort(
+            (a, b) => Number(b?.distance?.cosSim) - Number(a?.distance?.cosSim)
+          )
           ?.map((f: Message, i: number) => (
             <div key={i} className="mt-4 border-b border-b-fe-blue-500">
               #{i + 1}:{" "}
@@ -352,7 +476,14 @@ export default function ForkOverlay({
                     ))
                 : ""}
               <br />
-              <span>Confidence: {f?.confidence ?? ""}</span>
+              <p>Confidence: {f?.confidence ?? ""}</p>
+              <p>Euclidean Distance: {f?.distance?.eucDist ?? ""}</p>
+              <p>Cosine Similarity: {f?.distance?.cosSim ?? ""}</p>
+              <p>Dot Product: {f?.distance?.dotProd ?? ""}</p>
+              <p>Manhattan Distance: {f?.distance?.manDist ?? ""}</p>
+              <p>Chebyshev Distance: {f?.distance?.chebyDist ?? ""}</p>
+              <p>Jaccard Distance: {f?.distance?.jaccDist ?? ""}</p>
+              <p>Forked On Token: {f.forkedOnToken ?? ""}</p>
             </div>
           ))}
       </div>
